@@ -1,0 +1,6 @@
+dist
+result
+.log
+node_modules
+.direnv
+coverage
