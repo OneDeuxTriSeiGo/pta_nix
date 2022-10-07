@@ -18,6 +18,7 @@ file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
       tests = testUtils.evalNixTests [
         ./lib/dates.test.nix
+        ./lib/paths.test.nix
       ];
 
       packages.x86_64-linux.hello = nixpkgs.legacyPackages.x86_64-linux.hello;
