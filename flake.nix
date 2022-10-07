@@ -17,6 +17,7 @@ file, You can obtain one at https://mozilla.org/MPL/2.0/.
       pta = import ./lib { inherit nixpkgs; };
 
       tests = testUtils.evalNixTests [
+        ./lib/dates.test.nix
       ];
 
       packages.x86_64-linux.hello = nixpkgs.legacyPackages.x86_64-linux.hello;
