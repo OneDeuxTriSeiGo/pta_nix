@@ -12,11 +12,12 @@ file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
   outputs = { self, nixpkgs, ... }:
     let
-      testUtils = import ./nix/test.nix { inherit nixpkgs; };
+      common = import ./lib/common.nix { inherit nixpkgs; };
+      testRunner = import ./nix/testRunner.nix { inherit nixpkgs common; };
     in {
-      pta = import ./lib { inherit nixpkgs; };
+      pta = import ./lib/accounting.nix { inherit nixpkgs; };
 
-      tests = testUtils.evalNixTests [
+      tests = testRunner.evalNixTests [
         ./lib/dates.test.nix
         ./lib/paths.test.nix
         ./lib/accounting.test.nix

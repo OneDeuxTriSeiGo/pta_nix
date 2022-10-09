@@ -9,6 +9,8 @@ file, You can obtain one at https://mozilla.org/MPL/2.0/.
 }:
 
 let
+  common = import ./common.nix { inherit nixpkgs; };
+
   inherit (builtins) compareVersions elemAt getAttr length map match toString;
 
   inherit (lib.asserts) assertMsg;
@@ -21,7 +23,7 @@ let
 
   inherit (lib.versions) splitVersion major;
 
-  toEscapedNixStr = x: escapeNixString (toString x);
+  inherit (common) toEscapedNixStr;
 
   /* Parses a version string representation of a date "Y.M.D" into a list of integers [ Y M D ]. */
   toDate = (flip pipe) [
