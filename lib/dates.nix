@@ -36,6 +36,32 @@ let
   /* Reports if a given year is a leap year or not. */
   isLeapYear = year: (mod year 4 == 0) && ((mod year 100 != 0) || (mod year 400 == 0));
 
+  gregorianCalDaysPerMonth = {
+     "1" = y: 31;
+    "01" = y: 31;
+     "2" = y: if isLeapYear y then 29 else 28;
+    "02" = y: if isLeapYear y then 29 else 28;
+     "3" = y: 31;
+    "03" = y: 31;
+     "4" = y: 30;
+    "04" = y: 30;
+     "5" = y: 31;
+    "05" = y: 31;
+     "6" = y: 30;
+    "06" = y: 30;
+     "7" = y: 31;
+    "07" = y: 31;
+     "8" = y: 31;
+    "08" = y: 31;
+     "9" = y: 30;
+    "09" = y: 30;
+    "10" = y: 31;
+    "11" = y: 30;
+    "12" = y: 31;
+  };
+
+  daysPerMonth = year: monthStr: (getAttr monthStr gregorianCalDaysPerMonth) year;
+
 in {
 
   inherit toDate isLeapYear;
@@ -46,8 +72,8 @@ in {
     year = {
       p = "([[:digit:]]{4})";
       fn = x: {
-        start = elemAt x 0;
-        end   = elemAt x 0;
+        start = "${elemAt x 0}.1.1";
+        end   = "${elemAt x 0}.12.31";
       };
     };
 
@@ -55,8 +81,8 @@ in {
     yearToYear = {
       p = "([[:digit:]]{4})-([[:digit:]]{4})";
       fn = x: {
-        start = elemAt x 0;
-        end   = elemAt x 1;
+        start = "${elemAt x 0}.1.1";
+        end   = "${elemAt x 1}.12.31";
       };
     };
 
@@ -64,26 +90,33 @@ in {
     decade = {
       p = "([[:digit:]]{3})[Xx]";
       fn = x: {
-        start = (elemAt x 0) + "0";
-        end   = (elemAt x 0) + "9";
+        start = "${elemAt x 0}0.1.1";
+        end   = "${elemAt x 0}9.12.31";
       };
     };
 
     # Single Month
     month = {
       p = "([[:digit:]]{4})-([[:digit:]]{1,2})";
-      fn = x: {
-        start = (elemAt x 0) + "." + (elemAt x 1);
-        end   = (elemAt x 0) + "." + (elemAt x 1);
+      fn = x: let
+        y = elemAt x 0;
+        m = elemAt x 1;
+      in {
+        start = "${y}.${m}.1";
+        end   = "${y}.${m}.${toString (daysPerMonth (toInt y) m)}";
       };
     };
 
     # Month Range within a Year
     yearMonthToMonth = {
       p = "([[:digit:]]{4})-([[:digit:]]{1,2})--([[:digit:]]{1,2})";
-      fn = x: {
-        start = (elemAt x 0) + "." + (elemAt x 1);
-        end   = (elemAt x 0) + "." + (elemAt x 2);
+      fn = x: let
+        y  = elemAt x 0;
+        m1 = elemAt x 1;
+        m2 = elemAt x 2;
+      in {
+        start = "${y}.${m1}.1";
+        end   = "${y}.${m2}.${toString (daysPerMonth (toInt y) m2)}";
       };
     };
 
@@ -104,21 +137,6 @@ in {
   /* Gap checker supporting down to month level granularity w/ mostly accurate day granularity. */
   gapChecker = firstEnd: secondStart: let
 
-    daysPerMonth = {
-       "1" = y: 31;
-       "2" = y: if isLeapYear y then 29 else 28;
-       "3" = y: 31;
-       "4" = y: 30;
-       "5" = y: 31;
-       "6" = y: 30;
-       "7" = y: 31;
-       "8" = y: 31;
-       "9" = y: 30;
-      "10" = y: 31;
-      "11" = y: 30;
-      "12" = y: 31;
-    };
-
     first = toDate firstEnd;
     second = toDate secondStart;
 
@@ -135,11 +153,11 @@ in {
     isLastMonthOfYear = x: (month x) == 12;
 
     isFirstDayOfMonth = x: (day x) == 1;
-    isLastDayOfMonth = x: (day x) == (getAttr ( toString (month x) ) daysPerMonth) (year x);
+    isLastDayOfMonth = x: (day x) == daysPerMonth (year x) (toString (month x));
 
     isMonthValid = x: (hasMonth x) -> (((month x) >= 1) && ((month x) <= 12));
     isDayValid = x: (hasDay x) -> (
-      ((day x) >= 1) && ((day x) <= getAttr ( toString (month x) ) daysPerMonth (year x))
+      ((day x) >= 1) && ((day x) <= daysPerMonth (year x) (toString (month x)))
     );
 
     monthErrStr = x: "Month value ${toEscapedNixStr (month x)} of "
@@ -264,13 +282,13 @@ in {
     };
   };
 
-  isInPeriod =
-    period:
-    statementRange:
+  periodsOverlap = lhs: rhs:
     let
-      afterStart = (compareVersions statementRange.start period.start) >= 0;
-      beforeEnd = (compareVersions statementRange.end period.end) <= 0;
+      lhsStartBeforeRhsEnd   = (compareVersions lhs.start rhs.end)   <= 0;
+      lhsEndAfterRhsStart    = (compareVersions lhs.end   rhs.start) >= 0;
+
     in
-      afterStart && beforeEnd;
+      lhsStartBeforeRhsEnd && lhsEndAfterRhsStart;
+
 
 }

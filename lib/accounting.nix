@@ -26,8 +26,8 @@ let
 
   inherit (lib.versions) splitVersion major;
 
-  dates = import ./dates.nix {};
-  paths = import ./paths.nix {};
+  dates = import ./dates.nix { inherit nixpkgs; };
+  paths = import ./paths.nix { inherit nixpkgs; };
 
 in {
 
@@ -68,38 +68,36 @@ in {
         (x: head (splitString "." (baseNameOf x)))
         (x: map (v: (r: optional (r != null) (v.fn r)) (match v.p x)) fmts)
         (findFirst (x: x != []) [])
-        (x: assert assertMsg (x != []) "Statement with invalid date format"; x)
+        (x: assert assertMsg (x != []) "Statement with invalid date format"; head x)
       ];
 
       dates = pipe srcs [
-        (map (x: { date = srcToDate x; } // x))
+        (map (x: { date = srcToDate x.file; } // x))
         (sort (a: b: (compareVersions a.date.start b.date.start) < 0))
       ];
 
       # List matching the start of each element with the end of the next
-      cmpRangeList = dateStrs: pipe dateStrs [
+      cmpRangeList = pipe dates [
         (x: (zipAttrs x).date)
         (x: { lhs = [] ++ init x; rhs = (drop 1 x) ++ []; })
-        (x: zipListsWith (a: b: { lhs = a.start; rhs = b.end; }) x.lhs x.rhs)
+        (x: zipListsWith (a: b: { lhs = a.end; rhs = b.start; }) x.lhs x.rhs)
       ];
-      isNotOverlap = (flip pipe) [
+      isNotOverlap = pipe cmpRangeList [
         (map (mapAttrs (k: v: splitVersion v)))
         (all ({lhs, rhs}: (compareLists compare lhs rhs) < 0))
       ];
-      isNoGaps = all ({lhs, rhs}: isNoGapFn lhs rhs);
-    in pipe dates [
-      (x: { value = x; cmpList = cmpRangeList x; })
-      (x: assert assertMsg (isNoGaps x.cmpList) "Missing statements"; x)
-      (x: assert assertMsg (isNotOverlap x.cmpList) "Overlapping statements"; x)
-      (x: x.value)
-    ];
+      isNoGaps = all ({lhs, rhs}: isNoGapFn lhs rhs) cmpRangeList;
+    in
+      if ! isNoGaps then throw "Missing statements"
+      else if ! isNotOverlap then throw "Overlapping statements"
+      else dates;
 
   /*
   Builds a set of periods with corresponding statement dependencies for each period. If a statement
   falls into the period, even partially, it is included. Statements can be included into multiple
   periods.
 
-  type: { date-range attrset pair = [ list of statements ]; ... }
+  type: [ { period = date-range attrset pair; statements = [ list of statements ]; } ... ]
   */
   batchStatementsByPeriod =
     # The period format to use.
@@ -108,10 +106,14 @@ in {
     statements:
     let
       jSpec = journalPeriodSpec;
-      fullRange = { start = (head statements).start; end = (last statements).end; };
+      fullRange = { start = (head statements).date.start; end = (last statements).date.end; };
       periodRanges = map jSpec.fromIdentifier (jSpec.toPeriods fullRange);
+      batchFn = p: {
+        period = p;
+        statements = filter (s: dates.periodsOverlap p s.date) statements;
+      };
     in
-      map (p: filter (s: dates.isInPeriod p s.date) statements) periodRanges;
+      map batchFn periodRanges;
 
   /* Builds a "generated" journal from a set of statements. */
   generatedJournal =
