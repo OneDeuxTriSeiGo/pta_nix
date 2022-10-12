@@ -17,7 +17,7 @@ let
 
   inherit (lib.lists) genList;
 
-  inherit (lib.strings) escapeNixString toInt;
+  inherit (lib.strings) escapeNixString fixedWidthNumber toInt;
 
   inherit (lib.trivial) flip mod pipe;
 
@@ -71,27 +71,34 @@ in {
     # Single Year
     year = {
       p = "([[:digit:]]{4})";
-      fn = x: {
-        start = "${elemAt x 0}.1.1";
-        end   = "${elemAt x 0}.12.31";
+      fn = x: let
+        y = elemAt x 0;
+      in {
+        start = "${y}.01.01";
+        end   = "${y}.12.31";
       };
     };
 
     # Year Range
     yearToYear = {
       p = "([[:digit:]]{4})-([[:digit:]]{4})";
-      fn = x: {
-        start = "${elemAt x 0}.1.1";
-        end   = "${elemAt x 1}.12.31";
+      fn = x: let
+        y1 = elemAt x 0;
+        y2 = elemAt x 1;
+      in {
+        start = "${y1}.01.01";
+        end   = "${y2}.12.31";
       };
     };
 
     # Decade Wildcard
     decade = {
       p = "([[:digit:]]{3})[Xx]";
-      fn = x: {
-        start = "${elemAt x 0}0.1.1";
-        end   = "${elemAt x 0}9.12.31";
+      fn = x: let
+        yPart = elemAt x 0;
+      in {
+        start = "${yPart}0.01.01";
+        end   = "${yPart}9.12.31";
       };
     };
 
@@ -101,9 +108,10 @@ in {
       fn = x: let
         y = elemAt x 0;
         m = elemAt x 1;
+        d = fixedWidthNumber 2 (daysPerMonth (toInt y) m);
       in {
-        start = "${y}.${m}.1";
-        end   = "${y}.${m}.${toString (daysPerMonth (toInt y) m)}";
+        start = "${y}.${m}.01";
+        end   = "${y}.${m}.${d}";
       };
     };
 
@@ -114,9 +122,10 @@ in {
         y  = elemAt x 0;
         m1 = elemAt x 1;
         m2 = elemAt x 2;
+        d2 = fixedWidthNumber 2 (daysPerMonth (toInt y) m2);
       in {
-        start = "${y}.${m1}.1";
-        end   = "${y}.${m2}.${toString (daysPerMonth (toInt y) m2)}";
+        start = "${y}.${m1}.01";
+        end   = "${y}.${m2}.${d2}";
       };
     };
 
@@ -127,9 +136,17 @@ in {
         + "--"
         + "([[:digit:]]{4})-([[:digit:]]{1,2})-([[:digit:]]{1,2})"
         );
-      fn = x: {
-        start = (elemAt x 0) + "." + (elemAt x 1) + "." + (elemAt x 2);
-        end   = (elemAt x 3) + "." + (elemAt x 4) + "." + (elemAt x 5);
+      fn = x: let
+        y1 = elemAt x 0;
+        m1 = elemAt x 1;
+        d1 = elemAt x 2;
+
+        y2 = elemAt x 3;
+        m2 = elemAt x 4;
+        d2 = elemAt x 5;
+      in {
+        start = "${y1}.${m1}.${d1}";
+        end   = "${y2}.${m2}.${d2}";
       };
     };
   };
@@ -261,7 +278,7 @@ in {
         let
           startYear = toInt ident;
         in
-          { start = "${toString startYear}.1.1"; end = "${toString startYear}.12.31"; };
+          { start = "${toString startYear}.01.01"; end = "${toString startYear}.12.31"; };
 
       /* Sorted list of periods contained within the date range. */
       toPeriods =
